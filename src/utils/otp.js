@@ -32,6 +32,8 @@ async function createOTP(userId, type = 'login') {
 }
 
 async function verifyOTP(userId, code, type = 'login') {
+    console.log(`🔍 verifyOTP - userId: ${userId}, code: ${code}, type: ${type}`);
+    
     const { data: tokens, error } = await supabase
         .from('otp_tokens')
         .select('*')
@@ -41,22 +43,31 @@ async function verifyOTP(userId, code, type = 'login') {
         .order('created_at', { ascending: false })
         .limit(1);
 
+    console.log(`🔍 Query error: ${error}`);
+    console.log(`🔍 Found tokens:`, tokens);
+
     if (error || !tokens || tokens.length === 0) {
+        console.log(`❌ No active OTP found for userId: ${userId}, type: ${type}`);
         return { valid: false, reason: 'No active OTP found. Please request a new one.' };
     }
 
     const token = tokens[0];
+    console.log(`✅ Token found:`, { id: token.id, otp_code: token.otp_code, expires_at: token.expires_at, used: token.used });
 
     // Check expiry
     if (new Date() > new Date(token.expires_at)) {
+        console.log(`❌ OTP expired`);
         return { valid: false, reason: 'OTP expired, please request a new one.' };
     }
 
     // Check code
+    console.log(`🔍 Comparing: "${token.otp_code.toUpperCase()}" vs "${code.toUpperCase()}"`);
     if (token.otp_code.toUpperCase() !== code.toUpperCase()) {
+        console.log(`❌ OTP code mismatch`);
         return { valid: false, reason: 'Invalid OTP code.' };
     }
 
+    console.log(`✅ OTP verified, marking as used`);
     // Mark as used
     await supabase.from('otp_tokens').update({ used: true }).eq('id', token.id);
 
