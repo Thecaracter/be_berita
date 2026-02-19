@@ -10,7 +10,7 @@ const app = express();
 // ─── Middleware ──────────────────────────
 // CORS disabled for testing
 app.use(cors({
-    origin: process.env.FRONTEND_URL || '*',  
+    origin:  '*',  
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
