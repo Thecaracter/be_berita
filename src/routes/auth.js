@@ -227,9 +227,7 @@ router.post('/verify-otp', async (req, res, next) => {
             });
         }
 
-        // For reset_password type — return a short-lived reset token
-        const resetToken = signAccessToken({ id: user.id, purpose: 'reset_password' });
-        return res.status(200).json({ message: 'OTP verified.', resetToken });
+        return res.status(200).json({ message: 'OTP verified.' });
     } catch (err) {
         next(err);
     }
@@ -358,9 +356,9 @@ router.post('/forgot-password', otpLimiter, async (req, res, next) => {
 
 router.post('/reset-password', async (req, res, next) => {
     try {
-        const { resetToken, newPassword, confirmPassword } = req.body;
+        const { email, otp, newPassword, confirmPassword } = req.body;
 
-        if (!resetToken || !newPassword || !confirmPassword) {
+        if (!email || !otp || !newPassword || !confirmPassword) {
             return res.status(400).json({ error: 'All fields are required.' });
         }
 
@@ -375,27 +373,40 @@ router.post('/reset-password', async (req, res, next) => {
             });
         }
 
-        const { verifyAccessToken } = require('../utils/jwt');
-        let decoded;
-        try {
-            decoded = verifyAccessToken(resetToken);
-        } catch {
-            return res.status(401).json({ error: 'Invalid or expired reset token.' });
+        if (otp.length !== 4 || !/^\d{4}$/.test(otp)) {
+            return res.status(400).json({ error: 'OTP must be 4 digits.' });
         }
 
-        if (decoded.purpose !== 'reset_password') {
-            return res.status(401).json({ error: 'Invalid reset token.' });
+        // Get user by email
+        const { data: user } = await supabase
+            .from('users')
+            .select('id')
+            .eq('email', email.toLowerCase())
+            .single();
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found.' });
         }
 
+        // Verify OTP
+        const result = await verifyOTP(user.id, otp, 'reset_password');
+
+        if (!result.valid) {
+            const status = result.reason.includes('expired') ? 410 : 400;
+            return res.status(status).json({ error: result.reason });
+        }
+
+        // Update password
         const password_hash = await bcrypt.hash(newPassword, 12);
         const { error } = await supabase
             .from('users')
             .update({ password_hash, updated_at: new Date().toISOString() })
-            .eq('id', decoded.id);
+            .eq('id', user.id);
 
         if (error) throw error;
 
-        await supabase.from('sessions').delete().eq('user_id', decoded.id);
+        // Logout all sessions
+        await supabase.from('sessions').delete().eq('user_id', user.id);
 
         return res.status(200).json({ message: 'Password reset successfully. Please log in.' });
     } catch (err) {
