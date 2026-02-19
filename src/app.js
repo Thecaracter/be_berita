@@ -3,7 +3,6 @@ const express = require('express');
 const cors = require('cors');
 const authRoutes = require('./routes/auth');
 const newsRoutes = require('./routes/news');
-const bookmarkRoutes = require('./routes/bookmarks');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -36,7 +35,6 @@ app.get('/api/health', (req, res) => {
 // ─── Routes ─────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/news', newsRoutes);
-app.use('/api/bookmarks', bookmarkRoutes);
 
 // ─── 404 ────────────────────────────────
 app.use((req, res) => {

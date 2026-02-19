@@ -3,6 +3,19 @@
 -- Jalankan ini di Supabase SQL Editor
 -- =============================================
 
+-- Drop all existing tables (fresh migration)
+DROP TABLE IF EXISTS public.bookmarks cascade;
+
+DROP TABLE IF EXISTS public.comments cascade;
+
+DROP TABLE IF EXISTS public.likes cascade;
+
+DROP TABLE IF EXISTS public.sessions cascade;
+
+DROP TABLE IF EXISTS public.otp_tokens cascade;
+
+DROP TABLE IF EXISTS public.users cascade;
+
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- =============================================
@@ -81,23 +94,6 @@ CREATE INDEX IF NOT EXISTS idx_comments_article_url ON public.comments (article_
 CREATE INDEX IF NOT EXISTS idx_comments_user_id ON public.comments (user_id);
 
 -- =============================================
--- TABLE: bookmarks
--- User bisa bookmark artikel
--- =============================================
-CREATE TABLE IF NOT EXISTS public.bookmarks (
-    id UUID DEFAULT gen_random_uuid () PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES public.users (id) ON DELETE CASCADE,
-    article_url TEXT NOT NULL,
-    article_data JSONB NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-    CONSTRAINT bookmarks_user_article_unique UNIQUE (user_id, article_url)
-);
-
-CREATE INDEX IF NOT EXISTS idx_bookmarks_user_id ON public.bookmarks (user_id);
-
-CREATE INDEX IF NOT EXISTS idx_bookmarks_article_url ON public.bookmarks (article_url);
-
--- =============================================
 -- Disable RLS (kita pakai service_role key dari backend)
 -- =============================================
 ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
@@ -109,5 +105,3 @@ ALTER TABLE public.sessions DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.likes DISABLE ROW LEVEL SECURITY;
 
 ALTER TABLE public.comments DISABLE ROW LEVEL SECURITY;
-
-ALTER TABLE public.bookmarks DISABLE ROW LEVEL SECURITY;

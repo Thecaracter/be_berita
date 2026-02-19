@@ -92,8 +92,8 @@ router.post('/register', async (req, res, next) => {
 
 // ─────────────────────────────────────────
 // POST /api/auth/login
-// Returns { needsOtp: true, userId } always
-// (sends OTP to email every time for security)
+// Returns { needsOtp: true } if first login (sends OTP)
+// Returns { accessToken, user } if not first login (skip OTP)
 // ─────────────────────────────────────────
 router.post('/login', loginLimiter, async (req, res, next) => {
     try {
@@ -130,26 +130,54 @@ router.post('/login', loginLimiter, async (req, res, next) => {
 
         console.log('✅ Password match');
 
-        // Generate and send OTP
-        console.log('📧 Creating OTP...');
-        const otp = await createOTP(user.id, 'login');
-        console.log('✅ OTP created:', otp);
+        // Check if first login
+        if (user.is_first_login) {
+            // First login: send OTP
+            console.log('📧 First login detected, creating OTP...');
+            const otp = await createOTP(user.id, 'login');
+            console.log('✅ OTP created:', otp);
 
-        console.log('📨 Sending OTP email to:', user.email);
-        await sendOTPEmail({
-            to: user.email,
-            name: user.full_name,
-            otp,
-            type: 'login',
-        });
-        console.log('✅ OTP email sent');
+            console.log('📨 Sending OTP email to:', user.email);
+            await sendOTPEmail({
+                to: user.email,
+                name: user.full_name,
+                otp,
+                type: 'login',
+            });
+            console.log('✅ OTP email sent');
 
-        return res.status(200).json({
-            message: 'OTP sent to your email.',
-            needsOtp: true,
-            userId: user.id,
-            isFirstLogin: user.is_first_login,
-        });
+            return res.status(200).json({
+                message: 'OTP sent to your email.',
+                needsOtp: true,
+                userId: user.id,
+                isFirstLogin: true,
+            });
+        } else {
+            // Not first login: bypass OTP, create session and return token directly
+            console.log('✅ Login successful (not first login)');
+
+            const tokenPayload = { id: user.id, email: user.email, full_name: user.full_name };
+            const accessToken = signAccessToken(tokenPayload);
+
+            // Store session hash
+            const tokenHash = crypto.createHash('sha256').update(accessToken).digest('hex');
+            const deviceInfo = req.headers['user-agent'] || 'Unknown';
+
+            await supabase.from('sessions').upsert(
+                { user_id: user.id, token_hash: tokenHash, device_info: deviceInfo },
+                { onConflict: 'user_id' }
+            );
+
+            return res.status(200).json({
+                message: 'Login successful.',
+                accessToken,
+                user: {
+                    id: user.id,
+                    email: user.email,
+                    full_name: user.full_name,
+                },
+            });
+        }
     } catch (err) {
         next(err);
     }
@@ -189,6 +217,20 @@ router.post('/verify-otp', async (req, res, next) => {
         }
 
         if (type === 'login') {
+            // Update is_first_login to false if true
+            if (user.is_first_login) {
+                const { error: updateError } = await supabase
+                    .from('users')
+                    .update({ is_first_login: false, updated_at: new Date().toISOString() })
+                    .eq('id', user.id);
+
+                if (updateError) {
+                    console.error('❌ Error updating is_first_login:', updateError);
+                    throw updateError;
+                }
+                console.log('✅ is_first_login updated to false for user:', user.id);
+            }
+
             // Create access token
             const tokenPayload = { id: user.id, email: user.email, full_name: user.full_name };
             const accessToken = signAccessToken(tokenPayload);
@@ -201,11 +243,6 @@ router.post('/verify-otp', async (req, res, next) => {
                 { user_id: user.id, token_hash: tokenHash, device_info: deviceInfo },
                 { onConflict: 'user_id' }
             );
-
-            // Update is_first_login flag
-            if (user.is_first_login) {
-                await supabase.from('users').update({ is_first_login: false }).eq('id', user.id);
-            }
 
             return res.status(200).json({
                 message: 'Login successful.',
@@ -272,6 +309,35 @@ router.post('/logout', authMiddleware, async (req, res, next) => {
     try {
         await supabase.from('sessions').delete().eq('user_id', req.user.id);
         return res.status(200).json({ message: 'Logged out successfully.' });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// ─────────────────────────────────────────
+// DELETE /api/auth/account
+// Delete user account (cascade deletes bookmarks, comments, likes, etc)
+// ─────────────────────────────────────────
+router.delete('/account', authMiddleware, async (req, res, next) => {
+    try {
+        const userId = req.user.id;
+
+        // Delete user (this will cascade delete all related data)
+        const { error } = await supabase
+            .from('users')
+            .delete()
+            .eq('id', userId);
+
+        if (error) {
+            console.error('❌ Error deleting user account:', error);
+            throw error;
+        }
+
+        console.log('✅ User account deleted:', userId);
+
+        return res.status(200).json({ 
+            message: 'Account deleted successfully. All your data (bookmarks, comments, likes) have been removed.' 
+        });
     } catch (err) {
         next(err);
     }
