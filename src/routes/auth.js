@@ -358,7 +358,11 @@ router.post('/reset-password', async (req, res, next) => {
     try {
         const { email, otp, newPassword, confirmPassword } = req.body;
 
+        console.log('🔍 Reset Password Request Body:', req.body);
+        console.log('🔍 email:', email, '| otp:', otp, '| newPassword:', newPassword, '| confirmPassword:', confirmPassword);
+
         if (!email || !otp || !newPassword || !confirmPassword) {
+            console.log('❌ Missing fields - email:', !!email, 'otp:', !!otp, 'newPassword:', !!newPassword, 'confirmPassword:', !!confirmPassword);
             return res.status(400).json({ error: 'All fields are required.' });
         }
 
