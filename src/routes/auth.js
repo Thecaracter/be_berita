@@ -10,9 +10,8 @@ const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
 
-// --- Rate Limiters ---
 const otpLimiter = rateLimit({
-    windowMs: 3 * 60 * 1000, // 3 minutes
+    windowMs: 3 * 60 * 1000,
     max: 1,
     message: { error: 'Please wait before requesting a new OTP.' },
     standardHeaders: true,
@@ -21,19 +20,15 @@ const otpLimiter = rateLimit({
 });
 
 const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
+    windowMs: 15 * 60 * 1000,
     max: 10,
     message: { error: 'Too many login attempts. Try again later.' },
 });
 
-// ─────────────────────────────────────────
-// POST /api/auth/register
-// ─────────────────────────────────────────
 router.post('/register', async (req, res, next) => {
     try {
         const { full_name, email, password, confirm_password } = req.body;
 
-        // Validation
         if (!full_name || !email || !password || !confirm_password) {
             return res.status(400).json({ error: 'All fields are required.' });
         }
@@ -43,7 +38,6 @@ router.post('/register', async (req, res, next) => {
             return res.status(400).json({ error: 'Invalid email format.' });
         }
 
-        // Password: min 8 chars, at least 1 letter and 1 number
         const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d\W]{8,}$/;
         if (!passwordRegex.test(password)) {
             return res.status(400).json({
@@ -55,7 +49,6 @@ router.post('/register', async (req, res, next) => {
             return res.status(400).json({ error: 'Passwords do not match.' });
         }
 
-        // Check email taken
         const { data: existing } = await supabase
             .from('users')
             .select('id')
@@ -90,11 +83,6 @@ router.post('/register', async (req, res, next) => {
     }
 });
 
-// ─────────────────────────────────────────
-// POST /api/auth/login
-// Returns { needsOtp: true } if first login (sends OTP)
-// Returns { accessToken, user } if not first login (skip OTP)
-// ─────────────────────────────────────────
 router.post('/login', loginLimiter, async (req, res, next) => {
     try {
         const { email, password } = req.body;
@@ -130,14 +118,8 @@ router.post('/login', loginLimiter, async (req, res, next) => {
 
         console.log('✅ Password match');
 
-        // Check if first login
         if (user.is_first_login) {
-            // First login: send OTP
-            console.log('📧 First login detected, creating OTP...');
             const otp = await createOTP(user.id, 'login');
-            console.log('✅ OTP created:', otp);
-
-            console.log('📨 Sending OTP email to:', user.email);
             await sendOTPEmail({
                 to: user.email,
                 name: user.full_name,
@@ -153,13 +135,9 @@ router.post('/login', loginLimiter, async (req, res, next) => {
                 isFirstLogin: true,
             });
         } else {
-            // Not first login: bypass OTP, create session and return token directly
-            console.log('✅ Login successful (not first login)');
-
             const tokenPayload = { id: user.id, email: user.email, full_name: user.full_name };
             const accessToken = signAccessToken(tokenPayload);
 
-            // Store session hash
             const tokenHash = crypto.createHash('sha256').update(accessToken).digest('hex');
             const deviceInfo = req.headers['user-agent'] || 'Unknown';
 
@@ -183,9 +161,6 @@ router.post('/login', loginLimiter, async (req, res, next) => {
     }
 });
 
-// ─────────────────────────────────────────
-// POST /api/auth/verify-otp
-// ─────────────────────────────────────────
 router.post('/verify-otp', async (req, res, next) => {
     try {
         const { userId, otp, type = 'login' } = req.body;
@@ -228,14 +203,11 @@ router.post('/verify-otp', async (req, res, next) => {
                     console.error('❌ Error updating is_first_login:', updateError);
                     throw updateError;
                 }
-                console.log('✅ is_first_login updated to false for user:', user.id);
             }
 
-            // Create access token
             const tokenPayload = { id: user.id, email: user.email, full_name: user.full_name };
             const accessToken = signAccessToken(tokenPayload);
 
-            // Store session hash (single-device: UPSERT replaces old session)
             const tokenHash = crypto.createHash('sha256').update(accessToken).digest('hex');
             const deviceInfo = req.headers['user-agent'] || 'Unknown';
 
@@ -263,9 +235,6 @@ router.post('/verify-otp', async (req, res, next) => {
     }
 });
 
-// ─────────────────────────────────────────
-// POST /api/auth/resend-otp
-// ─────────────────────────────────────────
 router.post('/resend-otp', async (req, res, next) => {
     try {
         const { userId, type = 'login' } = req.body;
@@ -302,9 +271,6 @@ router.post('/resend-otp', async (req, res, next) => {
     }
 });
 
-// ─────────────────────────────────────────
-// POST /api/auth/logout
-// ─────────────────────────────────────────
 router.post('/logout', authMiddleware, async (req, res, next) => {
     try {
         await supabase.from('sessions').delete().eq('user_id', req.user.id);
@@ -314,15 +280,10 @@ router.post('/logout', authMiddleware, async (req, res, next) => {
     }
 });
 
-// ─────────────────────────────────────────
-// DELETE /api/auth/account
-// Delete user account (cascade deletes bookmarks, comments, likes, etc)
-// ─────────────────────────────────────────
 router.delete('/account', authMiddleware, async (req, res, next) => {
     try {
         const userId = req.user.id;
 
-        // Delete user (this will cascade delete all related data)
         const { error } = await supabase
             .from('users')
             .delete()
@@ -343,9 +304,6 @@ router.delete('/account', authMiddleware, async (req, res, next) => {
     }
 });
 
-// ─────────────────────────────────────────
-// GET /api/auth/me
-// ─────────────────────────────────────────
 router.get('/me', authMiddleware, async (req, res, next) => {
     try {
         const { data: user, error } = await supabase
@@ -364,9 +322,6 @@ router.get('/me', authMiddleware, async (req, res, next) => {
     }
 });
 
-// ─────────────────────────────────────────
-// POST /api/auth/forgot-password
-// ─────────────────────────────────────────
 router.post('/forgot-password', otpLimiter, async (req, res, next) => {
     try {
         const { email } = req.body;
@@ -401,9 +356,6 @@ router.post('/forgot-password', otpLimiter, async (req, res, next) => {
     }
 });
 
-// ─────────────────────────────────────────
-// POST /api/auth/reset-password
-// ─────────────────────────────────────────
 router.post('/reset-password', async (req, res, next) => {
     try {
         const { resetToken, newPassword, confirmPassword } = req.body;
@@ -443,7 +395,6 @@ router.post('/reset-password', async (req, res, next) => {
 
         if (error) throw error;
 
-        // Invalidate all sessions
         await supabase.from('sessions').delete().eq('user_id', decoded.id);
 
         return res.status(200).json({ message: 'Password reset successfully. Please log in.' });

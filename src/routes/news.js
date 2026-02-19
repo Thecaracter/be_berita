@@ -3,12 +3,11 @@ const axios = require('axios');
 const NodeCache = require('node-cache');
 
 const router = express.Router();
-const cache = new NodeCache({ stdTTL: 300 }); // cache 5 menit
+const cache = new NodeCache({ stdTTL: 300 });
 
 const NEWSAPI_BASE = 'https://newsapi.org/v2';
 const SUPPORTED_CATEGORIES = ['technology', 'business', 'health', 'entertainment', 'sports', 'science'];
 
-// Default keyword per category (untuk /everything endpoint)
 const CATEGORY_KEYWORDS = {
     technology: 'technology OR tech OR AI OR software',
     business: 'business OR economy OR market OR finance',
@@ -35,18 +34,12 @@ function handleNewsApiError(error, res) {
     return res.status(500).json({ error: 'Gagal mengambil berita.' });
 }
 
-// Hitung tanggal 30 hari lalu untuk default dari parameter
 function getFromDate(daysAgo = 30) {
     const date = new Date();
     date.setDate(date.getDate() - daysAgo);
-    return date.toISOString().split('T')[0]; // YYYY-MM-DD
+    return date.toISOString().split('T')[0];
 }
 
-// ─────────────────────────────────────────
-// GET /api/news
-// Top berita dari /v2/everything
-// Query: page, pageSize, sortBy (publishedAt|relevancy|popularity)
-// ─────────────────────────────────────────
 router.get('/', async (req, res) => {
     const { page = 1, pageSize = 20, sortBy = 'publishedAt' } = req.query;
     const cacheKey = `everything-${page}-${pageSize}-${sortBy}`;
@@ -82,9 +75,6 @@ router.get('/', async (req, res) => {
     }
 });
 
-// ─────────────────────────────────────────
-// GET /api/news/search?q=keyword&page=1&sortBy=publishedAt
-// ─────────────────────────────────────────
 router.get('/search', async (req, res) => {
     const { q, page = 1, pageSize = 20, sortBy = 'publishedAt' } = req.query;
 
@@ -124,17 +114,10 @@ router.get('/search', async (req, res) => {
     }
 });
 
-// ─────────────────────────────────────────
-// GET /api/news/categories
-// ─────────────────────────────────────────
 router.get('/categories', (req, res) => {
     res.json({ categories: SUPPORTED_CATEGORIES });
 });
 
-// ─────────────────────────────────────────
-// GET /api/news/category/:category
-// Pakai keyword per kategori di /everything
-// ─────────────────────────────────────────
 router.get('/category/:category', async (req, res) => {
     const { category } = req.params;
     const { page = 1, pageSize = 20, sortBy = 'publishedAt' } = req.query;

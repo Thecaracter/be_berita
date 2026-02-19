@@ -2,10 +2,6 @@ const { verifyAccessToken } = require('../utils/jwt');
 const supabase = require('../config/supabase');
 const crypto = require('crypto');
 
-/**
- * Middleware: validate JWT access token and verify active session.
- * Attaches req.user = { id, email, full_name }
- */
 async function authMiddleware(req, res, next) {
     try {
         const authHeader = req.headers.authorization;

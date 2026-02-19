@@ -4,12 +4,8 @@ const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
 
-// All bookmark routes require authentication
 router.use(authMiddleware);
 
-// ─────────────────────────────────────────
-// GET /api/bookmarks
-// ─────────────────────────────────────────
 router.get('/', async (req, res, next) => {
     try {
         const { data, error } = await supabase
@@ -26,10 +22,6 @@ router.get('/', async (req, res, next) => {
     }
 });
 
-// ─────────────────────────────────────────
-// POST /api/bookmarks
-// Body: { article_url, article_data }
-// ─────────────────────────────────────────
 router.post('/', async (req, res, next) => {
     try {
         const { article_url, article_data } = req.body;
@@ -62,9 +54,6 @@ router.post('/', async (req, res, next) => {
     }
 });
 
-// ─────────────────────────────────────────
-// DELETE /api/bookmarks/:id
-// ─────────────────────────────────────────
 router.delete('/:id', async (req, res, next) => {
     try {
         const { id } = req.params;
@@ -73,7 +62,7 @@ router.delete('/:id', async (req, res, next) => {
             .from('bookmarks')
             .delete()
             .eq('id', id)
-            .eq('user_id', req.user.id) // ensure ownership
+            .eq('user_id', req.user.id)
             .select('id')
             .single();
 
@@ -87,10 +76,6 @@ router.delete('/:id', async (req, res, next) => {
     }
 });
 
-// ─────────────────────────────────────────
-// DELETE /api/bookmarks/url
-// Delete by article URL
-// ─────────────────────────────────────────
 router.delete('/by-url', async (req, res, next) => {
     try {
         const { article_url } = req.body;

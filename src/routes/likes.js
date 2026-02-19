@@ -4,13 +4,8 @@ const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
 
-// Semua route likes butuh auth
 router.use(authMiddleware);
 
-// ─────────────────────────────────────────
-// GET /api/likes?article_url=...
-// Cek apakah user sudah like artikel + total likes artikel itu
-// ─────────────────────────────────────────
 router.get('/', async (req, res, next) => {
     try {
         const { article_url } = req.query;
@@ -19,13 +14,11 @@ router.get('/', async (req, res, next) => {
             return res.status(400).json({ error: 'article_url wajib diisi.' });
         }
 
-        // Total likes artikel
         const { count: totalLikes } = await supabase
             .from('likes')
             .select('id', { count: 'exact', head: true })
             .eq('article_url', article_url);
 
-        // Apakah user ini sudah like?
         const { data: userLike } = await supabase
             .from('likes')
             .select('id')
@@ -43,11 +36,6 @@ router.get('/', async (req, res, next) => {
     }
 });
 
-// ─────────────────────────────────────────
-// POST /api/likes
-// Toggle like (like jika belum, unlike jika sudah)
-// Body: { article_url }
-// ─────────────────────────────────────────
 router.post('/', async (req, res, next) => {
     try {
         const { article_url } = req.body;
@@ -56,7 +44,6 @@ router.post('/', async (req, res, next) => {
             return res.status(400).json({ error: 'article_url wajib diisi.' });
         }
 
-        // Cek sudah like atau belum
         const { data: existing } = await supabase
             .from('likes')
             .select('id')
@@ -65,7 +52,6 @@ router.post('/', async (req, res, next) => {
             .single();
 
         if (existing) {
-            // Sudah like → unlike
             await supabase.from('likes').delete().eq('id', existing.id);
 
             const { count: total } = await supabase
@@ -76,7 +62,6 @@ router.post('/', async (req, res, next) => {
             return res.json({ message: 'Like removed.', is_liked: false, total_likes: total || 0 });
         }
 
-        // Belum like → like
         await supabase.from('likes').insert({ user_id: req.user.id, article_url });
 
         const { count: total } = await supabase

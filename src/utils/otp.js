@@ -1,22 +1,11 @@
 const supabase = require('../config/supabase');
 
-const OTP_LENGTH = 4; // 4-digit code (0000-9999)
 const OTP_EXPIRY_MINUTES = 3;
 
-/**
- * Generate a random 4-digit OTP (0000-9999)
- */
 function generateOTP() {
     return Math.floor(Math.random() * 10000).toString().padStart(4, '0');
 }
 
-/**
- * Create and store a new OTP for a user.
- * Invalidates all previous OTPs of the same type for that user.
- * @param {string} userId
- * @param {'login' | 'reset_password'} type
- * @returns {Promise<string>} The generated OTP code
- */
 async function createOTP(userId, type = 'login') {
     // Invalidate old OTPs of same type
     await supabase
@@ -42,13 +31,6 @@ async function createOTP(userId, type = 'login') {
     return otp;
 }
 
-/**
- * Verify an OTP code for a user.
- * @param {string} userId
- * @param {string} code - The OTP submitted by user
- * @param {'login' | 'reset_password'} type
- * @returns {{ valid: boolean, reason?: string }}
- */
 async function verifyOTP(userId, code, type = 'login') {
     const { data: tokens, error } = await supabase
         .from('otp_tokens')
@@ -70,7 +52,7 @@ async function verifyOTP(userId, code, type = 'login') {
         return { valid: false, reason: 'OTP expired, please request a new one.' };
     }
 
-    // Check code (case-insensitive)
+    // Check code
     if (token.otp_code.toUpperCase() !== code.toUpperCase()) {
         return { valid: false, reason: 'Invalid OTP code.' };
     }
@@ -81,9 +63,6 @@ async function verifyOTP(userId, code, type = 'login') {
     return { valid: true };
 }
 
-/**
- * Check if user can request a new OTP (cooldown: 3 minutes from last request)
- */
 async function canResendOTP(userId, type = 'login') {
     const cooldownMs = 3 * 60 * 1000;
 

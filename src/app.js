@@ -7,8 +7,6 @@ const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 
-// ─── Middleware ──────────────────────────
-// CORS disabled for testing
 app.use(cors({
     origin:  '*',  
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -19,7 +17,6 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// ─── Health Check ────────────────────────
 app.get('/', (req, res) => {
     res.json({
         status: 'ok',
@@ -33,19 +30,15 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// ─── Routes ─────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/news', newsRoutes);
 
-// ─── 404 ────────────────────────────────
 app.use((req, res) => {
     res.status(404).json({ error: `Route ${req.method} ${req.path} not found.` });
 });
 
-// ─── Error Handler ───────────────────────
 app.use(errorHandler);
 
-// ─── Start Server (local dev) ────────────
 if (require.main === module) {
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, () => {

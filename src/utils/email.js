@@ -1,8 +1,5 @@
 const transporter = require('../config/email');
 
-/**
- * Send OTP email to user for login or reset password
- */
 async function sendOTPEmail({ to, name, otp, type = 'login' }) {
     const subject =
         type === 'login'

@@ -4,10 +4,6 @@ const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
 
-// ─────────────────────────────────────────
-// GET /api/comments?article_url=...&page=1
-// Ambil komentar untuk satu artikel (publik, tidak perlu auth)
-// ─────────────────────────────────────────
 router.get('/', async (req, res, next) => {
     try {
         const { article_url, page = 1, pageSize = 20 } = req.query;
@@ -49,10 +45,6 @@ router.get('/', async (req, res, next) => {
     }
 });
 
-// ─────────────────────────────────────────
-// POST /api/comments — butuh auth
-// Body: { article_url, content }
-// ─────────────────────────────────────────
 router.post('/', authMiddleware, async (req, res, next) => {
     try {
         const { article_url, content } = req.body;
@@ -95,10 +87,6 @@ router.post('/', authMiddleware, async (req, res, next) => {
     }
 });
 
-// ─────────────────────────────────────────
-// PUT /api/comments/:id — edit komentar sendiri
-// Body: { content }
-// ─────────────────────────────────────────
 router.put('/:id', authMiddleware, async (req, res, next) => {
     try {
         const { id } = req.params;
@@ -150,14 +138,10 @@ router.put('/:id', authMiddleware, async (req, res, next) => {
     }
 });
 
-// ─────────────────────────────────────────
-// DELETE /api/comments/:id — hapus komentar sendiri
-// ─────────────────────────────────────────
 router.delete('/:id', authMiddleware, async (req, res, next) => {
     try {
         const { id } = req.params;
 
-        // Pastikan komentar milik user ini
         const { data: existing } = await supabase
             .from('comments')
             .select('id, user_id')
