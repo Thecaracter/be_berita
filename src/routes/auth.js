@@ -334,7 +334,7 @@ router.post('/forgot-password', otpLimiter, async (req, res, next) => {
             .eq('email', email.toLowerCase())
             .single();
 
-        // Always return success to prevent email enumeration
+      
         if (!user) {
             return res.status(200).json({
                 message: 'If this email is registered, an OTP has been sent.',
@@ -381,7 +381,7 @@ router.post('/reset-password', async (req, res, next) => {
             return res.status(400).json({ error: 'OTP must be 4 digits.' });
         }
 
-        // Get user by email
+      
         const { data: user } = await supabase
             .from('users')
             .select('id')
@@ -392,7 +392,7 @@ router.post('/reset-password', async (req, res, next) => {
             return res.status(404).json({ error: 'User not found.' });
         }
 
-        // Verify OTP
+     
         const result = await verifyOTP(user.id, otp, 'reset_password');
 
         if (!result.valid) {
@@ -400,7 +400,7 @@ router.post('/reset-password', async (req, res, next) => {
             return res.status(status).json({ error: result.reason });
         }
 
-        // Update password
+
         const password_hash = await bcrypt.hash(newPassword, 12);
         const { error } = await supabase
             .from('users')
@@ -409,7 +409,7 @@ router.post('/reset-password', async (req, res, next) => {
 
         if (error) throw error;
 
-        // Logout all sessions
+
         await supabase.from('sessions').delete().eq('user_id', user.id);
 
         return res.status(200).json({ message: 'Password reset successfully. Please log in.' });

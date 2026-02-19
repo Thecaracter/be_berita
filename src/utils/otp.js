@@ -7,7 +7,6 @@ function generateOTP() {
 }
 
 async function createOTP(userId, type = 'login') {
-    // Invalidate old OTPs of same type
     await supabase
         .from('otp_tokens')
         .update({ used: true })
@@ -60,7 +59,6 @@ async function verifyOTP(userId, code, type = 'login') {
         return { valid: false, reason: 'OTP expired, please request a new one.' };
     }
 
-    // Check code
     console.log(`🔍 Comparing: "${token.otp_code.toUpperCase()}" vs "${code.toUpperCase()}"`);
     if (token.otp_code.toUpperCase() !== code.toUpperCase()) {
         console.log(`❌ OTP code mismatch`);
@@ -68,7 +66,6 @@ async function verifyOTP(userId, code, type = 'login') {
     }
 
     console.log(`✅ OTP verified, marking as used`);
-    // Mark as used
     await supabase.from('otp_tokens').update({ used: true }).eq('id', token.id);
 
     return { valid: true };
