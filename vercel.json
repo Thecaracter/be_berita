@@ -1,16 +1,5 @@
 {
     "version": 2,
-    "env": {
-        "NODE_ENV": "production",
-        "FRONTEND_URL": "@frontend_url",
-        "SUPABASE_URL": "@supabase_url",
-        "SUPABASE_SERVICE_ROLE_KEY": "@supabase_service_role_key",
-        "SMTP_HOST": "@smtp_host",
-        "SMTP_PORT": "@smtp_port",
-        "SMTP_SECURE": "@smtp_secure",
-        "SMTP_USER": "@smtp_user",
-        "SMTP_PASS": "@smtp_pass"
-    },
     "builds": [
         {
             "src": "api/index.js",
