@@ -1,0 +1,111 @@
+const supabase = require('../config/supabase');
+
+const OTP_LENGTH = 4; // 4-digit code (0000-9999)
+const OTP_EXPIRY_MINUTES = 3;
+
+/**
+ * Generate a random 4-digit OTP (0000-9999)
+ */
+function generateOTP() {
+    return Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+}
+
+/**
+ * Create and store a new OTP for a user.
+ * Invalidates all previous OTPs of the same type for that user.
+ * @param {string} userId
+ * @param {'login' | 'reset_password'} type
+ * @returns {Promise<string>} The generated OTP code
+ */
+async function createOTP(userId, type = 'login') {
+    // Invalidate old OTPs of same type
+    await supabase
+        .from('otp_tokens')
+        .update({ used: true })
+        .eq('user_id', userId)
+        .eq('type', type)
+        .eq('used', false);
+
+    const otp = generateOTP();
+    const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000).toISOString();
+
+    const { error } = await supabase.from('otp_tokens').insert({
+        user_id: userId,
+        otp_code: otp,
+        type,
+        expires_at: expiresAt,
+        used: false,
+    });
+
+    if (error) throw new Error('Failed to store OTP: ' + error.message);
+
+    return otp;
+}
+
+/**
+ * Verify an OTP code for a user.
+ * @param {string} userId
+ * @param {string} code - The OTP submitted by user
+ * @param {'login' | 'reset_password'} type
+ * @returns {{ valid: boolean, reason?: string }}
+ */
+async function verifyOTP(userId, code, type = 'login') {
+    const { data: tokens, error } = await supabase
+        .from('otp_tokens')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('type', type)
+        .eq('used', false)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+    if (error || !tokens || tokens.length === 0) {
+        return { valid: false, reason: 'No active OTP found. Please request a new one.' };
+    }
+
+    const token = tokens[0];
+
+    // Check expiry
+    if (new Date() > new Date(token.expires_at)) {
+        return { valid: false, reason: 'OTP expired, please request a new one.' };
+    }
+
+    // Check code (case-insensitive)
+    if (token.otp_code.toUpperCase() !== code.toUpperCase()) {
+        return { valid: false, reason: 'Invalid OTP code.' };
+    }
+
+    // Mark as used
+    await supabase.from('otp_tokens').update({ used: true }).eq('id', token.id);
+
+    return { valid: true };
+}
+
+/**
+ * Check if user can request a new OTP (cooldown: 3 minutes from last request)
+ */
+async function canResendOTP(userId, type = 'login') {
+    const cooldownMs = 3 * 60 * 1000;
+
+    const { data: tokens } = await supabase
+        .from('otp_tokens')
+        .select('created_at')
+        .eq('user_id', userId)
+        .eq('type', type)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+    if (!tokens || tokens.length === 0) return { canResend: true };
+
+    const lastCreated = new Date(tokens[0].created_at);
+    const elapsed = Date.now() - lastCreated.getTime();
+
+    if (elapsed < cooldownMs) {
+        const remaining = Math.ceil((cooldownMs - elapsed) / 1000);
+        return { canResend: false, remainingSeconds: remaining };
+    }
+
+    return { canResend: true };
+}
+
+module.exports = { generateOTP, createOTP, verifyOTP, canResendOTP };
